@@ -1,7 +1,6 @@
 from ultralytics import YOLO
 
 def predict(filepath):
-    print("Predicting on image:", filepath)
     # Load a model
     model = YOLO("yolo_models/yolo11x.pt")  # pretrained YOLO11n model
 
