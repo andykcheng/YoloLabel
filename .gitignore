@@ -1,5 +1,6 @@
 __pycache__
 annotations/
 images/
+yolo_models/
 classes.json
 file_statuses.json

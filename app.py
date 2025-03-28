@@ -8,6 +8,7 @@ import io
 import zipfile
 import shutil
 from typing import List, Dict, Optional
+import yolo_predict
 
 app = FastAPI(title="Image Files API")
 
@@ -513,4 +514,45 @@ async def update_file_status(filename: str, data: Dict = Body(...)):
         raise
     except Exception as e:
         print(f"Error updating file status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/predict/{filename}")
+async def predict_image(filename: str):
+    """Perform YOLO prediction on a specific image in the images folder."""
+    try:
+        # Construct full path to the image
+        image_path = os.path.join(IMAGES_FOLDER, filename)
+        print("image path:", image_path)
+        # Check if the file exists
+        if not os.path.isfile(image_path):
+            raise HTTPException(status_code=404, detail=f"Image file {filename} not found")
+        
+        # Call the predict function from yolo_predict module
+        try:
+            predictions = yolo_predict.predict(image_path)
+            return_string = ""
+            
+            for result in predictions:
+                boxes = result.boxes  # Boxes object for bounding box outputs
+                masks = result.masks  # Masks object for segmentation masks outputs
+                keypoints = result.keypoints  # Keypoints object for pose outputs
+                probs = result.probs  # Probs object for classification outputs
+                obb = result.obb  # Oriented boxes object for OBB outputs
+                
+                return_string += f"Boxes: {boxes}\n"
+                return_string += f"Keypoints: {keypoints}\n"
+                return_string += f"Probs: {probs}\n"
+                return_string += f"Oriented boxes: {obb}\n"
+                # Save the result with boxes, labels and confidence
+            
+                return {"message": f"{return_string}", "status": 200}
+
+        except Exception as e:
+            print(f"Prediction error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error during prediction: {str(e)}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing prediction request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
