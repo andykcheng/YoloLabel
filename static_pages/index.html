@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO Image Labeler</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/main.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Images</h2>
+            <div class="status-filter-container">
+                <div class="status-filter-label">Filter:</div>
+                <div class="status-filter-buttons">
+                    <button id="filter-done" class="status-filter-btn done active" title="Done">D</button>
+                    <button id="filter-in-progress" class="status-filter-btn in-progress active" title="In Progress">P</button>
+                    <button id="filter-attention" class="status-filter-btn attention active" title="Needs Attention">A</button>
+                </div>
+            </div>
+            <div class="file-list-container">
+                <ul id="file-list" class="file-list">
+                    <!-- Files will be loaded dynamically with the following structure:
+                    <li>
+                        <div class="file-item">
+                            <span class="file-status">DONE</span>
+                            <span class="filename">image.jpg</span>
+                            <span class="box-counts">Person:2 Car:1</span>
+                        </div>
+                    </li>
+                    -->
+                </ul>
+            </div>
+            <div class="controls">
+                <h3>Classes</h3>
+                <div class="label-container">
+                    <input type="text" id="new-class" placeholder="New class name">
+                    <button id="add-class-btn">Add</button>
+                </div>
+                <div class="class-manager">
+                    <select id="class-selector" class="class-selector">
+                        <!-- Classes will be loaded dynamically -->
+                    </select>
+                    <div class="class-buttons">
+                        <button id="rename-class-btn" title="Rename selected class">Rename</button>
+                        <button id="delete-class-btn" title="Delete selected class">Delete</button>
+                    </div>
+                </div>
+                
+                <div class="class-instructions-section">
+                    <h3>Class Instructions</h3>
+                    <div id="class-shortcut" class="class-shortcut">Shortcut: <span id="shortcut-key">-</span></div>
+                    <div class="class-instructions">
+                        <label for="class-instructions-text">Annotation Instructions:</label>
+                        <textarea id="class-instructions-text" rows="5" placeholder="Enter instructions for annotating this class (e.g., Include the entire object, draw box tightly around edges, etc.)"></textarea>
+                        <button id="save-instructions-btn">Save Instructions</button>
+                    </div>
+                </div>
+                
+                <div class="box-controls">
+                    <button id="create-box-btn" class="primary-btn">Create Box</button>
+                    <button id="delete-box-btn">Delete Selected</button>
+                </div>
+                <button id="save-btn" class="save-btn">Save Annotations</button>
+                <button id="export-btn" class="export-btn">Export YOLO Dataset</button>
+                <button id="check-system-btn" class="check-btn">Check System</button>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="image-canvas"></canvas>
+                <div id="loading" class="loading">Loading...</div>
+                <div id="no-image" class="no-image">Select an image from the list</div>
+            </div>
+            <div class="annotation-info">
+                <div class="annotation-flex-container">
+                    <div class="box-stats">
+                        <h3>Bounding Box</h3>
+                        <table id="box-stats" class="box-table">
+                            <tr>
+                                <th>Class</th>
+                                <th>X</th>
+                                <th>Y</th>
+                                <th>Width</th>
+                                <th>Height</th>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div class="upload-container">
+                        <h3>Upload Images</h3>
+                        <div id="upload-area" class="upload-area">
+                            <div class="upload-icon">📁</div>
+                            <p>Drag and drop image files here</p>
+                            <p class="upload-subtext">Supports jpg, jpeg, png, gif, webp, bmp</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

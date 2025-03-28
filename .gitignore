@@ -1,0 +1,5 @@
+__pycache__
+annotations/
+images/
+classes.json
+file_statuses.json
