@@ -517,7 +517,7 @@ async def update_file_status(filename: str, data: Dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/predict/{filename}")
-async def predict_image(filename: str):
+async def predict_image(filename: str, visualize: bool = True):
     """Perform YOLO prediction on a specific image in the images folder."""
     try:
         # Construct full path to the image
@@ -528,24 +528,29 @@ async def predict_image(filename: str):
         
         # Call the predict function from yolo_predict module
         try:
-            predictions = yolo_predict.predict(image_path)
-            return_boxes = []
-            
-            for result in predictions:
-                boxes = result.boxes  # Boxes object for bounding box outputs
-                masks = result.masks  # Masks object for segmentation masks outputs
-                keypoints = result.keypoints  # Keypoints object for pose outputs
-                probs = result.probs  # Probs object for classification outputs
-                obb = result.obb  # Oriented boxes object for OBB outputs
+            if visualize:
+                # Generate visualization and return both prediction results and visualization
+                vis_path = yolo_predict.predict_and_visualize(image_path, return_mode='path')
+                results = yolo_predict.predict(image_path)
+                formatted_results = yolo_predict.format_results(results)
                 
-                return_boxes.append({
-                    boxes, keypoints, probs, obb, masks
-                })
-
-                # Save the result with boxes, labels and confidence
-            
-            return {"message": f"{ return_boxes}", "status": 200}
-
+                # Return results with visualization path
+                return {
+                    "success": True,
+                    "filename": filename,
+                    "predictions": formatted_results,
+                    "visualization": os.path.basename(vis_path) if vis_path else None
+                }
+            else:
+                # Just return prediction results without visualization
+                results = yolo_predict.predict(image_path)
+                formatted_results = yolo_predict.format_results(results)
+                
+                return {
+                    "success": True,
+                    "filename": filename,
+                    "predictions": formatted_results
+                }
         except Exception as e:
             print(f"Prediction error: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error during prediction: {str(e)}")
@@ -554,4 +559,89 @@ async def predict_image(filename: str):
         raise
     except Exception as e:
         print(f"Error processing prediction request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/visualizations/{filename}")
+async def get_visualization(filename: str):
+    """Serve visualization images with bounding boxes."""
+    vis_path = os.path.join(yolo_predict.VISUALIZATIONS_DIR, filename)
+    
+    if not os.path.isfile(vis_path):
+        raise HTTPException(status_code=404, detail=f"Visualization {filename} not found")
+    
+    return FileResponse(
+        vis_path,
+        headers={"Cache-Control": "max-age=3600"}
+    )
+
+@app.get("/train")
+async def setup_training():
+    """Set up a YOLO training environment with the current dataset."""
+    try:
+        # Define the training directory
+        training_dir = os.path.join(os.getcwd(), "yolo_training")
+        
+        # 1. Create or clear the training directory
+        if os.path.exists(training_dir):
+            # Remove all contents
+            shutil.rmtree(training_dir)
+        
+        # Create fresh directory
+        os.makedirs(training_dir, exist_ok=True)
+        
+        # 2. Create necessary subdirectories
+        images_train_dir = os.path.join(training_dir, "images", "train")
+        labels_train_dir = os.path.join(training_dir, "labels", "train")
+        os.makedirs(images_train_dir, exist_ok=True)
+        os.makedirs(labels_train_dir, exist_ok=True)
+        
+        # 3. Copy images and annotations
+        # Get list of images
+        images = [f for f in os.listdir(IMAGES_FOLDER) 
+                  if os.path.isfile(os.path.join(IMAGES_FOLDER, f)) and 
+                  f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif'))]
+        
+        # Copy each image and its annotation if it exists
+        copied_images = 0
+        copied_labels = 0
+        
+        for image in images:
+            # Copy image
+            src_image = os.path.join(IMAGES_FOLDER, image)
+            dst_image = os.path.join(images_train_dir, image)
+            shutil.copy2(src_image, dst_image)
+            copied_images += 1
+            
+            # Copy annotation if it exists
+            annotation_file = os.path.splitext(image)[0] + ".txt"
+            src_annotation = os.path.join(ANNOTATIONS_FOLDER, annotation_file)
+            if os.path.exists(src_annotation):
+                dst_annotation = os.path.join(labels_train_dir, annotation_file)
+                shutil.copy2(src_annotation, dst_annotation)
+                copied_labels += 1
+        
+        # 4. Create dataset.yaml file
+        class_list = [c["name"] for c in load_classes()]
+        yaml_content = f"""# YOLO dataset configuration
+path: {training_dir}  # Path to dataset root
+train: images/train  # Train images folder
+val: images/train  # Validation images folder (using train for simplicity)
+
+# Classes
+nc: {len(class_list)}  # Number of classes
+names: {json.dumps(class_list)}  # Class names
+"""
+        with open(os.path.join(training_dir, "dataset.yaml"), 'w') as f:
+            f.write(yaml_content)
+        
+        return {
+            "success": True,
+            "message": "Training environment set up successfully",
+            "training_dir": training_dir,
+            "images_copied": copied_images,
+            "labels_copied": copied_labels,
+            "classes": class_list
+        }
+    except Exception as e:
+        print(f"Error setting up training environment: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

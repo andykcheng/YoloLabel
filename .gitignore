@@ -2,5 +2,8 @@ __pycache__
 annotations/
 images/
 yolo_models/
+yolo_training/
+visualization/
+custom_yolo_model/
 classes.json
 file_statuses.json
