@@ -36,13 +36,13 @@ def main():
     parser = argparse.ArgumentParser(description="Train a YOLO model on labeled data")
     
     # Training parameters
-    parser.add_argument("--epochs", type=int, default=50, 
-                        help="Number of training epochs (default: 50)")
-    parser.add_argument("--batch", type=int, default=16, 
-                        help="Batch size (default: 16)")
-    parser.add_argument("--img", type=int, default=640, 
-                        help="Input image size (default: 640)")
-    parser.add_argument("--model", type=str, default="n", 
+    parser.add_argument("--epochs", type=int, default=300, 
+                        help="Number of training epochs (default: 300)")
+    parser.add_argument("--batch", type=int, default=4, 
+                        help="Batch size (default: 4)")
+    parser.add_argument("--img", type=int, default=2048, 
+                        help="Input image size (default: 1024)")
+    parser.add_argument("--model", type=str, default="m", 
                         help="YOLO model size: n=nano, s=small, m=medium, l=large, x=xlarge (default: n)")
     parser.add_argument("--device", type=str, default=None, 
                         help="Training device, e.g., 0 for GPU 0, cpu for CPU (default: auto)")

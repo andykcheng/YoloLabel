@@ -574,7 +574,7 @@ async def get_visualization(filename: str):
         headers={"Cache-Control": "max-age=3600"}
     )
 
-@app.get("/train")
+@app.get("/setup_training")
 async def setup_training():
     """Set up a YOLO training environment with the current dataset."""
     try:

@@ -16,10 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteClassBtn = document.getElementById('delete-class-btn');
     const boxStatsTable = document.getElementById('box-stats');
     const checkSystemBtn = document.getElementById('check-system-btn');
+    const setupTrainingBtn = document.getElementById('setup-training-btn'); // New button for setup training
     const uploadArea = document.getElementById('upload-area');
     const classInstructionsText = document.getElementById('class-instructions-text');
     const saveInstructionsBtn = document.getElementById('save-instructions-btn');
     const shortcutKeyElement = document.getElementById('shortcut-key');
+    const predictBtn = document.getElementById('predict-btn'); // Add predict button element
     
     // Status filter elements
     const filterDoneBtn = document.getElementById('filter-done');
@@ -46,10 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let panStartX, panStartY;
     let fileStatuses = {}; // Store file statuses: DONE, IN_PROGRESS, ATTENTION
     let fileBoxCounts = {}; // Store box counts for each file by class
+    let originalInstructions = ''; // Track original instructions for comparison
     
-    // Status filter state - default all active
+    // Status filter state - default to hide DONE files
     let activeFilters = {
-        'DONE': true,
+        'DONE': false,          // Changed to false to hide by default
         'IN_PROGRESS': true,
         'ATTENTION': true
     };
@@ -199,6 +202,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Update the class shortcuts list
+    function updateClassShortcuts() {
+        const shortcutsList = document.getElementById('class-shortcuts-list');
+        if (!shortcutsList) return;
+        
+        // Clear existing shortcuts
+        shortcutsList.innerHTML = '';
+        
+        // Add shortcuts for each class (up to 9)
+        classesData.slice(0, 9).forEach((classData, index) => {
+            const li = document.createElement('li');
+            const kbd = document.createElement('kbd');
+            kbd.textContent = index + 1;
+            
+            // Add color dot
+            const colorDot = document.createElement('span');
+            colorDot.className = 'color-dot';
+            colorDot.style.backgroundColor = getClassColor(index).stroke;
+            
+            li.appendChild(kbd);
+            li.appendChild(document.createTextNode(' '));
+            li.appendChild(colorDot);
+            li.appendChild(document.createTextNode(` ${classData.name}`));
+            
+            shortcutsList.appendChild(li);
+        });
+        
+        // Add a message if there are more classes than can have shortcuts
+        if (classesData.length > 9) {
+            const li = document.createElement('li');
+            li.textContent = '(Only first 9 classes have shortcuts)';
+            li.style.fontStyle = 'italic';
+            li.style.color = '#777';
+            shortcutsList.appendChild(li);
+        }
+    }
+
     // Update the class selector dropdown with current classes
     function updateClassSelector() {
         if (!classSelector) {
@@ -234,6 +274,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         console.log('Class selector updated with options:', classSelector.options.length);
+        
+        // Update class shortcuts
+        updateClassShortcuts();
     }
     
     // Update the selected class instructions
@@ -245,12 +288,26 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update shortcut key (1-9, or "-" if beyond range)
             shortcutKeyElement.textContent = selectedIndex < 9 ? (selectedIndex + 1) : '-';
             
-            // Update instructions text
-            classInstructionsText.value = classData.instructions || '';
+            // Update instructions text and store original value
+            const instructions = classData.instructions || '';
+            classInstructionsText.value = instructions;
+            originalInstructions = instructions;
+            
+            // Hide the save button initially
+            saveInstructionsBtn.style.display = 'none';
         } else {
             shortcutKeyElement.textContent = '-';
             classInstructionsText.value = '';
+            originalInstructions = '';
+            saveInstructionsBtn.style.display = 'none';
         }
+    }
+    
+    // Check if instructions have changed from original
+    function checkInstructionsChanged() {
+        const currentInstructions = classInstructionsText.value;
+        const hasChanged = currentInstructions !== originalInstructions;
+        saveInstructionsBtn.style.display = hasChanged ? 'block' : 'none';
     }
     
     // Save class instructions to the server
@@ -271,8 +328,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.ok) {
                     // Update local data
                     classesData[selectedIndex].instructions = instructions;
+                    originalInstructions = instructions; // Update original to match current
                     console.log(`Instructions saved for class: ${classesData[selectedIndex].name}`);
                     alert(`Instructions saved for "${classesData[selectedIndex].name}"`);
+                    saveInstructionsBtn.style.display = 'none'; // Hide button after saving
                     return true;
                 } else {
                     const error = await response.json();
@@ -285,149 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`Error saving instructions: ${error.message}`);
                 return false;
             }
-        }
-    }
-    
-    // Add the missing addClass function
-    async function addClass(className) {
-        try {
-            const response = await fetch('/classes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ class_name: className }),
-            });
-            
-            if (response.ok) {
-                const updatedClasses = await response.json();
-                console.log('Class added successfully:', updatedClasses);
-                
-                // Update local class data
-                classesData = updatedClasses;
-                classes = classesData.map(c => typeof c === 'object' ? c.name : c);
-                
-                // Update the UI
-                updateClassSelector();
-                
-                // Update instructions for the newly added class
-                classSelector.value = classesData.length - 1;
-                updateClassInstructions();
-                
-                alert(`Class "${className}" added successfully`);
-                return true;
-            } else {
-                const error = await response.json();
-                console.error('Error adding class:', error.detail);
-                alert(`Error adding class: ${error.detail}`);
-                return false;
-            }
-        } catch (error) {
-            console.error('Error adding class:', error);
-            alert(`Error adding class: ${error.message}`);
-            return false;
-        }
-    }
-    
-    // Add this function for renaming a class
-    async function renameClass(classIndex, newName) {
-        try {
-            const response = await fetch(`/classes/${classIndex}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ class_name: newName }),
-            });
-            
-            if (response.ok) {
-                const updatedClasses = await response.json();
-                console.log('Class renamed successfully:', updatedClasses);
-                
-                // Update local class data
-                classesData = updatedClasses;
-                classes = classesData.map(c => typeof c === 'object' ? c.name : c);
-                
-                // Update the UI
-                updateClassSelector();
-                
-                // Update the selected class
-                classSelector.value = classIndex;
-                
-                // Redraw boxes to reflect the class name change
-                drawBoxes();
-                updateBoxStats();
-                
-                alert(`Class renamed to "${newName}"`);
-                return true;
-            } else {
-                const error = await response.json();
-                console.error('Error renaming class:', error.detail);
-                alert(`Error renaming class: ${error.detail}`);
-                return false;
-            }
-        } catch (error) {
-            console.error('Error renaming class:', error);
-            alert(`Error renaming class: ${error.message}`);
-            return false;
-        }
-    }
-    
-    // Add the missing deleteClass function
-    async function deleteClass(classIndex) {
-        try {
-            const response = await fetch(`/classes/${classIndex}`, {
-                method: 'DELETE',
-            });
-            
-            if (response.ok) {
-                const updatedClasses = await response.json();
-                console.log('Class deleted successfully:', updatedClasses);
-                
-                // Update local class data
-                classesData = updatedClasses;
-                classes = classesData.map(c => typeof c === 'object' ? c.name : c);
-                
-                // Update the UI
-                updateClassSelector();
-                
-                // Update selected class (select first class if the deleted class was selected)
-                if (classSelector.options.length > 0) {
-                    classSelector.selectedIndex = 0;
-                    updateClassInstructions();
-                }
-                
-                // Update all boxes that used the deleted class
-                let updated = false;
-                boxes.forEach(box => {
-                    if (box.class > classIndex) {
-                        // Shift class indices down for classes after the deleted one
-                        box.class--;
-                        updated = true;
-                    } else if (box.class === classIndex) {
-                        // For boxes with the deleted class, assign them to the first class
-                        box.class = 0;
-                        updated = true;
-                    }
-                });
-                
-                if (updated) {
-                    drawBoxes();
-                    updateBoxStats();
-                }
-                
-                alert(`Class deleted successfully`);
-                return true;
-            } else {
-                const error = await response.json();
-                console.error('Error deleting class:', error.detail);
-                alert(`Error deleting class: ${error.detail}`);
-                return false;
-            }
-        } catch (error) {
-            console.error('Error deleting class:', error);
-            alert(`Error deleting class: ${error.message}`);
-            return false;
         }
     }
     
@@ -870,10 +786,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadImage(filename) {
         console.log(`Loading image: ${filename}`);
         
-        // Update selected item styling
+        // Update selected item styling - fix selection logic to use filename element
         Array.from(fileList.children).forEach(li => {
             li.classList.remove('active');
-            if (li.textContent === filename) {
+            const filenameEl = li.querySelector('.filename');
+            if (filenameEl && filenameEl.textContent === filename) {
                 li.classList.add('active');
             }
         });
@@ -973,7 +890,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Draw each box
         boxes.forEach((box, index) => {
             const isSelected = index === selectedBoxIndex;
-            const classColor = getClassColor(box.class);
+            let classColor = getClassColor(box.class);
+            
+            // Use different style for predicted boxes
+            if (box.isPredicted) {
+                // Use a different color style for predicted boxes
+                classColor = {
+                    stroke: `hsl(${(box.class * 137) % 360}, 100%, 40%)`,
+                    fill: `hsla(${(box.class * 137) % 360}, 100%, 50%, 0.3)`
+                };
+            }
             
             // Draw rectangle
             ctx.strokeStyle = isSelected ? '#ff0000' : classColor.stroke;
@@ -989,7 +915,13 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.font = isSelected ? 'bold 14px Arial' : '12px Arial';
             
             // Add a background to the label for better readability
-            const label = classes[box.class] || `Unknown Class (${box.class})`;
+            let label = classes[box.class] || `Unknown Class (${box.class})`;
+            
+            // Add confidence if available for predicted boxes
+            if (box.isPredicted && box.confidence !== null) {
+                label += ` (${Math.round(box.confidence * 100)}%)`;
+            }
+            
             const labelWidth = ctx.measureText(label).width + 4;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(box.x, box.y - 20, labelWidth, 20);
@@ -1004,6 +936,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawHandle(box.x + box.width, box.y); // NE
                 drawHandle(box.x, box.y + box.height); // SW
                 drawHandle(box.x + box.width, box.y + box.height); // SE
+            }
+            
+            // Add "AI" indicator for predicted boxes
+            if (box.isPredicted) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(box.x + box.width - 20, box.y - 20, 20, 20);
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                ctx.fillText('AI', box.x + box.width - 16, box.y - 6);
             }
         });
     }
@@ -1066,6 +1007,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = boxStatsTable.insertRow();
             row.classList.toggle('selected', index === selectedBoxIndex);
             
+            // Add predicted class indicator
+            if (box.isPredicted) {
+                row.classList.add('predicted-box');
+            }
+            
             // Get class color for this row
             const classColor = getClassColor(box.class);
             
@@ -1095,6 +1041,16 @@ document.addEventListener('DOMContentLoaded', () => {
             classCell.appendChild(colorDot);
             classCell.appendChild(classDropdown);
             
+            // Add AI indicator for predicted boxes
+            if (box.isPredicted) {
+                const aiIndicator = document.createElement('span');
+                aiIndicator.className = 'ai-indicator';
+                aiIndicator.title = 'AI Predicted';
+                aiIndicator.textContent = '🤖';
+                aiIndicator.style.marginLeft = '2px';
+                classCell.appendChild(aiIndicator);
+            }
+            
             // Prevent dropdown click from triggering row selection
             classDropdown.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1107,14 +1063,23 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add event listener to update box class when dropdown changes
             classDropdown.addEventListener('change', (e) => {
-                e.stopPropagation(); // Prevent row selection when changing class
+                e.stopPropagation(); 
                 const newClassIndex = parseInt(e.target.value);
                 box.class = newClassIndex;
+                box.isPredicted = false; // No longer a prediction once modified
                 drawBoxes();
                 
-                // Don't call updateBoxStats() here to prevent the dropdown from closing
                 // Just update the color dot instead
                 colorDot.style.backgroundColor = getClassColor(newClassIndex).stroke;
+                
+                // Remove the predicted-box class from the row
+                row.classList.remove('predicted-box');
+                
+                // Remove AI indicator if it exists
+                const aiIndicator = classCell.querySelector('.ai-indicator');
+                if (aiIndicator) {
+                    classCell.removeChild(aiIndicator);
+                }
             });
             
             // Add remaining cells (coordinates and dimensions)
@@ -1148,7 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             actionCell.appendChild(deleteBtn);
             
-            // Add click event to select box (keep this functionality)
+            // Add click event to select box
             row.addEventListener('click', () => {
                 selectedBoxIndex = index;
                 drawBoxes();
@@ -1231,6 +1196,56 @@ Annotations Folder Exists: ${info.annotations_folder_exists}
             console.error('Error checking system:', error);
             alert(`Error checking system: ${error.message}`);
             return false;
+        }
+    }
+    
+    // Setup training data for YOLO
+    async function setupTraining() {
+        try {
+            console.log('Setting up YOLO training environment...');
+            loadingElement.style.display = 'block';
+            loadingElement.textContent = 'Setting up training environment...';
+            
+            const response = await fetch('/setup_training');
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Training setup complete:', result);
+                
+                if (result.success) {
+                    let message = `
+Training Setup Complete ✅
+------------------------
+📁 Training directory: ${result.training_dir}
+🖼️ Images copied: ${result.images_copied}
+🏷️ Labels copied: ${result.labels_copied}
+
+Classes:
+${result.classes.map((cls, i) => `  ${i}: ${cls}`).join('\n')}
+
+The training environment is now ready for YOLOv8.
+You can train a model using the command:
+yolo train model=yolov8n.pt data=${result.training_dir}/dataset.yaml epochs=50
+                    `;
+                    
+                    alert(message);
+                } else {
+                    alert(`Setup failed: ${result.error || 'Unknown error'}`);
+                }
+                
+                return result.success;
+            } else {
+                const error = await response.json();
+                console.error('Setup training error:', error);
+                alert(`Error setting up training: ${error.detail || 'Unknown error'}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error setting up training:', error);
+            alert(`Error setting up training: ${error.message}`);
+            return false;
+        } finally {
+            loadingElement.style.display = 'none';
         }
     }
     
@@ -1699,6 +1714,9 @@ Annotations Folder Exists: ${info.annotations_folder_exists}
                 // Select the class in the dropdown
                 classSelector.value = classIndex;
                 
+                // Update the instructions to match the newly selected class
+                updateClassInstructions();
+                
                 // Update the selected box's class if one is selected
                 if (selectedBoxIndex !== -1) {
                     boxes[selectedBoxIndex].class = classIndex;
@@ -1747,15 +1765,21 @@ Annotations Folder Exists: ${info.annotations_folder_exists}
         checkSystemBtn.addEventListener('click', checkSystem);
     }
     
+    // Setup Training button click
+    if (setupTrainingBtn) {
+        setupTrainingBtn.addEventListener('click', setupTraining);
+    }
+    
     // Add Class button click
     addClassBtn.addEventListener('click', () => {
-        const className = newClassInput.value.trim();
-        if (className) {
-            addClass(className).then(success => {
+        const className = prompt('Enter new class name:');
+        if (className && className.trim() !== '') {
+            addClass(className.trim()).then(success => {
                 if (success) {
-                    newClassInput.value = '';
                     // Select the newly added class
                     classSelector.value = classes.length - 1;
+                    // Update class shortcuts
+                    updateClassShortcuts();
                 }
             });
         }
@@ -1767,7 +1791,10 @@ Annotations Folder Exists: ${info.annotations_folder_exists}
         const newName = prompt('Enter new name for class:', classes[classIndex]);
         
         if (newName && newName.trim() !== '') {
-            renameClass(classIndex, newName.trim());
+            renameClass(classIndex, newName.trim()).then(() => {
+                // Update class shortcuts after renaming
+                updateClassShortcuts();
+            });
         }
     });
     
@@ -1775,15 +1802,154 @@ Annotations Folder Exists: ${info.annotations_folder_exists}
     deleteClassBtn.addEventListener('click', () => {
         const classIndex = parseInt(classSelector.value);
         if (confirm(`Are you sure you want to delete the class "${classes[classIndex]}"?`)) {
-            deleteClass(classIndex);
+            deleteClass(classIndex).then(() => {
+                // Update class shortcuts after deletion
+                updateClassShortcuts();
+            });
         }
     });
     
     // Add event listeners for the class instructions
     saveInstructionsBtn.addEventListener('click', saveClassInstructions);
     
+    // Add listener to detect changes in the instructions text
+    classInstructionsText.addEventListener('input', checkInstructionsChanged);
+    
     // Update instructions when class selection changes
     classSelector.addEventListener('change', updateClassInstructions);
+    
+    // Add predict button click handler
+    if (predictBtn) {
+        predictBtn.addEventListener('click', predictCurrentImage);
+    } else {
+        console.error("Predict button not found in the DOM. Check that the HTML includes the button element.");
+    }
+    
+    // Add function to call the predict endpoint and process results
+    async function predictCurrentImage() {
+        console.log("Predicting image")
+        if (!currentImage) {
+            alert('Please select an image first');
+            return;
+        }
+        
+        try {
+            // Show loading state
+            loadingElement.style.display = 'block';
+            loadingElement.textContent = 'Predicting...';
+            
+            // Call the predict endpoint
+            const response = await fetch(`/predict/${encodeURIComponent(currentImage)}`);
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Prediction result:', result);
+                
+                let totalBoxes = 0;
+                let shouldReplace = false;
+                
+                // Check if we have any predictions to add
+                const hasPredictions = result.predictions && 
+                    Array.isArray(result.predictions) && 
+                    result.predictions.length > 0;
+                
+                if (hasPredictions) {
+                    // Ask user if they want to replace or merge with existing boxes
+                    if (boxes.length > 0) {
+                        shouldReplace = confirm('Replace existing boxes with predictions? Click OK to replace, or Cancel to add predictions to existing boxes.');
+                    }
+                    
+                    // Clear existing boxes if replacing
+                    if (shouldReplace) {
+                        boxes = [];
+                    }
+                    
+                    // Process each prediction result
+                    result.predictions.forEach(predictionResult => {
+                        // Each prediction result contains a boxes array
+                        if (predictionResult.boxes && Array.isArray(predictionResult.boxes)) {
+                            // Process each box in the current prediction
+                            predictionResult.boxes.forEach(box => {
+                                try {
+                                    let x, y, width, height;
+                                    
+                                    // If absolute coordinates are provided (x1,y1,x2,y2), use those
+                                    if (box.x1 !== undefined && box.y1 !== undefined && 
+                                        box.x2 !== undefined && box.y2 !== undefined) {
+                                        x = Math.round(box.x1);
+                                        y = Math.round(box.y1);
+                                        width = Math.round(box.x2 - box.x1);
+                                        height = Math.round(box.y2 - box.y1);
+                                    } 
+                                    // Otherwise, use normalized coordinates
+                                    else if (box.x_center !== undefined && box.y_center !== undefined &&
+                                             box.width !== undefined && box.height !== undefined) {
+                                        x = Math.round((box.x_center - box.width/2) * canvas.width);
+                                        y = Math.round((box.y_center - box.height/2) * canvas.height);
+                                        width = Math.round(box.width * canvas.width);
+                                        height = Math.round(box.height * canvas.height);
+                                    } else {
+                                        console.error('Box missing required coordinates:', box);
+                                        return; // Skip this box
+                                    }
+                                    
+                                    // Handle class mapping
+                                    let classIndex = 0;
+                                    // First try to use the class name if provided
+                                    if (box.name) {
+                                        const nameIndex = classes.findIndex(c => 
+                                            c.toLowerCase() === box.name.toLowerCase());
+                                        if (nameIndex !== -1) {
+                                            classIndex = nameIndex;
+                                        }
+                                    } 
+                                    // Fall back to class index if provided and valid
+                                    else if (box.class !== undefined && box.class < classes.length) {
+                                        classIndex = box.class;
+                                    }
+                                    
+                                    // Add box with prediction flag
+                                    boxes.push({
+                                        x,
+                                        y,
+                                        width,
+                                        height,
+                                        class: classIndex,
+                                        confidence: box.confidence || null,
+                                        isPredicted: true, // Flag to identify predicted boxes
+                                        name: box.name // Save original name for reference
+                                    });
+                                    
+                                    totalBoxes++;
+                                } catch (error) {
+                                    console.error('Error processing prediction box:', error, box);
+                                }
+                            });
+                        }
+                    });
+                    
+                    // Update UI
+                    selectedBoxIndex = -1; // Deselect any selected box
+                    drawBoxes();
+                    updateBoxStats();
+                    
+                    alert(`Added ${totalBoxes} predicted boxes`);
+                } else {
+                    alert('No predictions found for this image');
+                }
+            } else {
+                const error = await response.json();
+                console.error('Prediction error:', error);
+                alert(`Error during prediction: ${error.detail || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error calling predict endpoint:', error);
+            alert(`Error: ${error.message}`);
+        } finally {
+            // Hide loading indicator
+            loadingElement.style.display = 'none';
+        }
+    }
     
     // Initialize the app with a slight delay to make sure the app is fully loaded
     console.log('Initializing YOLO Image Labeler...');

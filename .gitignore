@@ -7,3 +7,5 @@ visualization/
 custom_yolo_model/
 classes.json
 file_statuses.json
+*.pt
+visualizations/

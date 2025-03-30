@@ -23,6 +23,7 @@ body {
     padding: 20px;
     display: flex;
     flex-direction: column;
+    overflow-y: auto; /* Make the left panel scrollable */
 }
 
 .main-content {
@@ -44,6 +45,7 @@ h2, h3 {
     margin-bottom: 20px;
     border: 1px solid #ddd;
     border-radius: 4px;
+    max-height: 50vh; /* Limit the image list to 50% of the viewport height */
 }
 
 .file-list {
@@ -61,12 +63,14 @@ h2, h3 {
 }
 
 .file-list li.active {
-    background-color: #e0f7fa;
+    background-color: #c5e5ff; /* Lighter blue background */
     font-weight: normal;
+    border-left: 3px solid #2196F3; /* Blue left border for emphasis */
 }
 
 .file-list li.active .filename {
     font-weight: bold;
+    color: #0066cc; /* Darker blue text for better contrast */
 }
 
 .file-list li.loading-item, 
@@ -173,10 +177,22 @@ button:hover {
     background-color: #45a049;
 }
 
-.save-btn, .export-btn {
+.full-width-btn {
+    width: 100%;
+    background-color: #4caf50;
+    color: white;
+    margin-bottom: 10px;
+}
+
+.full-width-btn:hover {
+    background-color: #45a049;
+}
+
+.save-btn, .export-btn, .setup-btn {
     background-color: #2196f3;
     color: white;
-    margin-top: 10px;
+    margin:0px;
+
     width: 100%;
 }
 
@@ -186,7 +202,8 @@ button:hover {
 
 .export-btn {
     background-color: #673ab7;
-    margin-top: 10px;
+    margin:0px;
+    
 }
 
 .export-btn:hover {
@@ -196,7 +213,7 @@ button:hover {
 .check-btn {
     background-color: #ff9800;
     color: white;
-    margin-top: 10px;
+    margin:0px;
     width: 100%;
 }
 
@@ -232,6 +249,14 @@ button:hover {
     font-weight: 500;
 }
 
+#delete-class-btn {
+    background-color: #f44336;
+    color: white;
+}
+#rename-class-btn {
+    background-color: orange;
+    color: white;
+}
 #add-class-btn {
     margin-left: 5px;
 }
@@ -289,6 +314,7 @@ button:hover {
     width: 100%;
     background-color: #4caf50;
     color: white;
+    display: none; /* Hide by default */
 }
 
 #save-instructions-btn:hover {
@@ -303,7 +329,7 @@ button:hover {
     border-radius: 3px;
     background-color: #fff;
     font-size: 0.9em;
-    min-width: 120px;
+    min-width: 150px;
 }
 
 .box-delete-btn {
@@ -459,6 +485,63 @@ button:hover {
     min-width: 0; /* Allows flex items to shrink below content size */
 }
 
+/* Add styles for shortcuts container */
+.shortcuts-container {
+    flex: 1;
+    min-width: 150px;
+    max-width: 200px;
+}
+
+.shortcuts-section {
+    margin-bottom: 15px;
+}
+
+.shortcuts-section h4 {
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #555;
+}
+
+.shortcuts-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.shortcuts-list li {
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+/* Add styles for shortcuts container */
+.shortcuts-container {
+    flex: 1;
+    min-width: 150px;
+    max-width: 200px;
+}
+
+.shortcuts-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.shortcuts-list li {
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+kbd {
+    display: inline-block;
+    background-color: #f7f7f7;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+    padding: 2px 5px;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1;
+    margin: 0 2px;
+}
+
 .upload-container {
     flex: 1;
     margin-top: 0; /* Override previous margin */
@@ -470,7 +553,7 @@ button:hover {
 
 /* Update upload area styles for side-by-side layout */
 .annotation-info .upload-area {
-    height: 100%;
+    height: 80%;
     min-height: 150px;
     display: flex;
     flex-direction: column;
@@ -481,6 +564,11 @@ button:hover {
 @media (max-width: 900px) {
     .annotation-flex-container {
         flex-direction: column;
+    }
+    
+    .shortcuts-container {
+        max-width: none;
+        margin: 15px 0;
     }
     
     .upload-container {
@@ -496,7 +584,7 @@ button:hover {
 .file-item {
     display: flex;
     align-items: center;
-    width: 100%;
+    width: 80%;
     padding: 4px 0;
 }
 

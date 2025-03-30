@@ -26,7 +26,7 @@ def setup_training(api_url, verbose=False):
         dict: Setup response or error information
     """
     # Construct the endpoint URL
-    endpoint = f"{api_url}/train"
+    endpoint = f"{api_url}/setup_training"
     
     print("Setting up YOLO training environment...")
     print(f"Using endpoint: {endpoint}")

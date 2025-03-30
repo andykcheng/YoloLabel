@@ -6,6 +6,50 @@
     <title>YOLO Image Labeler</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="/static/js/main.js" defer></script>
+    <style>
+        /* Collapsible section styles */
+        .collapsible-header {
+            background-color: #555;
+            color: white;
+            cursor: pointer;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .collapsible-header:hover {
+            background-color: #666;
+        }
+        
+        .collapsible-header::after {
+            content: '▼';
+            font-size: 12px;
+            transition: transform 0.3s;
+        }
+        
+        .collapsible-header.collapsed::after {
+            transform: rotate(-90deg);
+        }
+        
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 8px;
+        }
+        
+        .collapsible-content.expanded {
+            max-height: 200px;
+            padding: 8px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -14,7 +58,7 @@
             <div class="status-filter-container">
                 <div class="status-filter-label">Filter:</div>
                 <div class="status-filter-buttons">
-                    <button id="filter-done" class="status-filter-btn done active" title="Done">D</button>
+                    <button id="filter-done" class="status-filter-btn done" title="Done">D</button>
                     <button id="filter-in-progress" class="status-filter-btn in-progress active" title="In Progress">P</button>
                     <button id="filter-attention" class="status-filter-btn attention active" title="Needs Attention">A</button>
                 </div>
@@ -33,38 +77,44 @@
                 </ul>
             </div>
             <div class="controls">
-                <h3>Classes</h3>
-                <div class="label-container">
-                    <input type="text" id="new-class" placeholder="New class name">
-                    <button id="add-class-btn">Add</button>
-                </div>
+                <b>Classes</b>
                 <div class="class-manager">
                     <select id="class-selector" class="class-selector">
                         <!-- Classes will be loaded dynamically -->
                     </select>
                     <div class="class-buttons">
+                        <button id="add-class-btn" class="full-width-btn">Add Class</button>
                         <button id="rename-class-btn" title="Rename selected class">Rename</button>
                         <button id="delete-class-btn" title="Delete selected class">Delete</button>
                     </div>
                 </div>
                 
                 <div class="class-instructions-section">
-                    <h3>Class Instructions</h3>
-                    <div id="class-shortcut" class="class-shortcut">Shortcut: <span id="shortcut-key">-</span></div>
                     <div class="class-instructions">
-                        <label for="class-instructions-text">Annotation Instructions:</label>
-                        <textarea id="class-instructions-text" rows="5" placeholder="Enter instructions for annotating this class (e.g., Include the entire object, draw box tightly around edges, etc.)"></textarea>
+                        <label for="class-instructions-text"><b>Instruction: (Shortcut <span id="shortcut-key">-</span>)</b></label>
+                        <textarea id="class-instructions-text" rows="4" placeholder="Enter instructions for annotating this class (e.g., Include the entire object, draw box tightly around edges, etc.)"></textarea>
                         <button id="save-instructions-btn">Save Instructions</button>
                     </div>
                 </div>
                 
+                <!-- Add a heading for Box Management section -->
+                <b>Box Management</b>
                 <div class="box-controls">
                     <button id="create-box-btn" class="primary-btn">Create Box</button>
-                    <button id="delete-box-btn">Delete Selected</button>
+                    <button id="delete-box-btn">Delete Box</button>
+                    <button id="predict-btn" class="predict-btn">Predict</button>
                 </div>
-                <button id="save-btn" class="save-btn">Save Annotations</button>
-                <button id="export-btn" class="export-btn">Export YOLO Dataset</button>
-                <button id="check-system-btn" class="check-btn">Check System</button>
+                
+                <!-- New collapsible section for advanced options -->
+                <div class="collapsible-section">
+                    <div id="advanced-options-header" class="collapsible-header collapsed">Advanced Options</div>
+                    <div id="advanced-options-content" class="collapsible-content">
+                        <button id="save-btn" class="save-btn">Save Annotations</button>
+                        <button id="export-btn" class="export-btn">Export YOLO Dataset</button>
+                        <button id="check-system-btn" class="check-btn">Check System</button>
+                        <button id="setup-training-btn" class="setup-btn">Setup Training</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="main-content">
@@ -88,6 +138,26 @@
                         </table>
                     </div>
                     
+                    <!-- New shortcuts section -->
+                    <div class="shortcuts-container">
+                        <h3>Keyboard Shortcuts</h3>
+                        <div class="shortcuts-section">
+                            <h4>Class Shortcuts</h4>
+                            <ul id="class-shortcuts-list" class="shortcuts-list">
+                                <!-- Will be populated dynamically with class shortcuts -->
+                            </ul>
+                        </div>
+                        <div class="shortcuts-section">
+                            <h4>Navigation</h4>
+                            <ul class="shortcuts-list">
+                                <li><kbd>Mouse wheel</kbd> Zoom in/out</li>
+                                <li><kbd>Middle mouse</kbd> Pan image</li>
+                                <li><kbd>Click</kbd> Select box</li>
+                                <li><kbd>Drag</kbd> Move/resize box</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
                     <div class="upload-container">
                         <h3>Upload Images</h3>
                         <div id="upload-area" class="upload-area">
@@ -100,5 +170,18 @@
             </div>
         </div>
     </div>
+    
+    <script>
+        // Add collapsible functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const header = document.getElementById('advanced-options-header');
+            const content = document.getElementById('advanced-options-content');
+            
+            header.addEventListener('click', function() {
+                this.classList.toggle('collapsed');
+                content.classList.toggle('expanded');
+            });
+        });
+    </script>
 </body>
 </html>
