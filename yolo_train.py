@@ -18,15 +18,14 @@ except ImportError:
     )
 
 # Constants
-DEFAULT_MODEL = "yolov8n.pt"  # Smallest YOLOv8 model
+DEFAULT_MODEL = "yolo11n.pt"  # YOLOv11 nano model - smaller and faster than small
 TRAINING_DIR = os.path.join(os.getcwd(), "yolo_training")
 OUTPUT_DIR = os.path.join(os.getcwd(), "custom_yolo_model")
 
 def train(
     epochs: int = 50,
     batch_size: int = 16,
-    image_size: int = 640,
-    model_size: str = "n",  # n, s, m, l, x
+    image_size: Union[int, List[int]] = 640,
     patience: int = 50,
     device: Optional[str] = None,
     workers: int = 8,
@@ -34,13 +33,12 @@ def train(
     verbose: bool = True,
 ) -> Dict[str, Any]:
     """
-    Train a YOLO model using data in the yolo_training folder.
+    Train a YOLOv11s model using data in the yolo_training folder.
     
     Args:
         epochs: Number of training epochs
         batch_size: Training batch size
-        image_size: Input image size
-        model_size: YOLO model size (n=nano, s=small, m=medium, l=large, x=xlarge)
+        image_size: Input image size (single int or [width, height])
         patience: Early stopping patience
         device: Device to run on (cuda device or 'cpu')
         workers: Number of worker threads for data loading
@@ -52,7 +50,13 @@ def train(
     """
     start_time = time.time()
     
-    # Ensure output directory exists
+    # Delete and recreate output directory unless we're resuming training
+    if os.path.exists(OUTPUT_DIR) and not resume:
+        if verbose:
+            print(f"Removing existing output directory: {OUTPUT_DIR}")
+        shutil.rmtree(OUTPUT_DIR)
+    
+    # Create the output directory
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     # Check if training directory exists and contains necessary data
@@ -71,17 +75,38 @@ def train(
     if not os.path.exists(train_path):
         raise ValueError(f"Training images not found: {train_path}")
     
-    # Determine the model path
-    model_path = f"yolov8{model_size}.pt"
-    if not model_size in ['n', 's', 'm', 'l', 'x']:
-        print(f"Warning: Invalid model size '{model_size}', defaulting to 'n'")
-        model_path = DEFAULT_MODEL
+    # Fixed model - always use YOLOv11s
+    model_path = DEFAULT_MODEL
+    
+    if verbose:
+        print(f"Specified model path: {model_path}")
     
     # If custom model exists in output dir and resume is True, use it
     custom_model_path = os.path.join(OUTPUT_DIR, "best.pt")
     if resume and os.path.exists(custom_model_path):
         print(f"Resuming training from {custom_model_path}")
         model_path = custom_model_path
+    
+    # Try to load the model - let YOLO handle downloading if needed
+    try:
+        # Skip manual download - YOLO will handle downloading the model if needed
+        if not os.path.exists(model_path) and verbose:
+            print(f"Model file {model_path} not found. YOLO will download a model automatically.")
+        
+        # Load the model
+        if verbose:
+            print(f"Loading the model: {model_path}")
+        
+        model = YOLO(model_path)
+        
+        # Print what model was actually loaded
+        if verbose:
+            print(f"Successfully loaded model: {model_path}")
+            print(f"Model type: {type(model).__name__}")
+            if hasattr(model, 'model') and hasattr(model.model, 'names'):
+                print(f"Model class names: {model.model.names}")
+    except Exception as e:
+        raise ValueError(f"Error loading YOLO model: {str(e)}. Please ensure you have internet connectivity.")
     
     if verbose:
         print(f"Starting YOLO training with the following configuration:")
@@ -91,11 +116,9 @@ def train(
         print(f"  Batch size: {batch_size}")
         print(f"  Image size: {image_size}")
         print(f"  Output directory: {OUTPUT_DIR}")
+        print("  Note: YOLO may download additional models during training as needed")
     
     try:
-        # Load a model
-        model = YOLO(model_path)
-        
         # Train the model - results are saved to the specified project/name directory
         results = model.train(
             data=yaml_path,
@@ -222,7 +245,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
     parser.add_argument("--batch", type=int, default=16, help="Batch size")
     parser.add_argument("--img", type=int, default=640, help="Image size")
-    parser.add_argument("--model", type=str, default="n", help="Model size (n, s, m, l, x)")
     parser.add_argument("--resume", action="store_true", help="Resume training from last checkpoint")
     parser.add_argument("--validate", action="store_true", help="Validate instead of train")
     
@@ -245,9 +267,8 @@ if __name__ == "__main__":
             epochs=args.epochs,
             batch_size=args.batch,
             image_size=args.img,
-            model_size=args.model,
             resume=args.resume,
-            verbose=True
+            verbose=True,
         )
         
         if results["success"]:

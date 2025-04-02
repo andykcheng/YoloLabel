@@ -9,3 +9,6 @@ classes.json
 file_statuses.json
 *.pt
 visualizations/
+backup_images/
+original_images/
+map_cap/

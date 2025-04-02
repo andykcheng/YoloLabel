@@ -40,10 +40,8 @@ def main():
                         help="Number of training epochs (default: 300)")
     parser.add_argument("--batch", type=int, default=4, 
                         help="Batch size (default: 4)")
-    parser.add_argument("--img", type=int, default=2048, 
-                        help="Input image size (default: 1024)")
-    parser.add_argument("--model", type=str, default="m", 
-                        help="YOLO model size: n=nano, s=small, m=medium, l=large, x=xlarge (default: n)")
+    parser.add_argument("--img", type=int, nargs=2, default=[1280, 720], 
+                        help="Input image width and height (default: 1280 720)")
     parser.add_argument("--device", type=str, default=None, 
                         help="Training device, e.g., 0 for GPU 0, cpu for CPU (default: auto)")
     parser.add_argument("--workers", type=int, default=8, 
@@ -83,14 +81,16 @@ def main():
     
     # Display training configuration
     print("\n📋 Training Configuration:")
-    print(f"  Model size: yolov8{args.model}")
+    print(f"  Model: YOLOv11n (will be downloaded automatically if needed)")
     print(f"  Epochs: {args.epochs}")
     print(f"  Batch size: {args.batch}")
-    print(f"  Image size: {args.img}x{args.img}")
+    print(f"  Image size: {args.img[0]}x{args.img[1]}")
     print(f"  Device: {args.device if args.device else 'auto'}")
     print(f"  Workers: {args.workers}")
     if args.resume:
         print("  Resuming from checkpoint: Yes")
+    else:
+        print("  Output directory will be reset: Yes")
     
     # Ask for confirmation
     if input("\nProceed with training? (y/n): ").lower() != 'y':
@@ -104,13 +104,12 @@ def main():
     results = train(
         epochs=args.epochs,
         batch_size=args.batch,
-        image_size=args.img,
-        model_size=args.model,
+        image_size=args.img,  # Now passing a list of [width, height]
         device=args.device,
         workers=args.workers,
         patience=args.patience,
         resume=args.resume,
-        verbose=True
+        verbose=True,
     )
     
     # Display training results

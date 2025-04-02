@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const boxStatsTable = document.getElementById('box-stats');
     const checkSystemBtn = document.getElementById('check-system-btn');
     const setupTrainingBtn = document.getElementById('setup-training-btn'); // New button for setup training
+    const backupBtn = document.getElementById('backup-btn'); // Add backup button element
     const uploadArea = document.getElementById('upload-area');
     const classInstructionsText = document.getElementById('class-instructions-text');
     const saveInstructionsBtn = document.getElementById('save-instructions-btn');
@@ -1249,6 +1250,28 @@ yolo train model=yolov8n.pt data=${result.training_dir}/dataset.yaml epochs=50
         }
     }
     
+    // Create backup of all data
+    async function backupData() {
+        try {
+            // First save the current annotations if any
+            if (currentImage && boxes.length > 0) {
+                await saveAnnotations(true); // Silent mode to avoid download prompt
+            }
+            
+            console.log('Creating backup...');
+            alert('Preparing backup for download. This may take a moment...');
+            
+            // Trigger download from the backup endpoint
+            window.location.href = '/backup';
+            
+            return true;
+        } catch (error) {
+            console.error('Error creating backup:', error);
+            alert(`Error creating backup: ${error.message}`);
+            return false;
+        }
+    }
+    
     // Get accurate canvas coordinates from mouse event
     function getCanvasCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
@@ -1765,6 +1788,11 @@ yolo train model=yolov8n.pt data=${result.training_dir}/dataset.yaml epochs=50
         checkSystemBtn.addEventListener('click', checkSystem);
     }
     
+    // Backup button click
+    if (backupBtn) {
+        backupBtn.addEventListener('click', backupData);
+    }
+    
     // Setup Training button click
     if (setupTrainingBtn) {
         setupTrainingBtn.addEventListener('click', setupTraining);
@@ -1817,6 +1845,127 @@ yolo train model=yolov8n.pt data=${result.training_dir}/dataset.yaml epochs=50
     
     // Update instructions when class selection changes
     classSelector.addEventListener('change', updateClassInstructions);
+    
+    // Add missing class management functions
+    
+    // Function to add a new class to the server
+    async function addClass(className) {
+        try {
+            const response = await fetch('/classes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ class_name: className }),
+            });
+            
+            if (response.ok) {
+                const updatedClasses = await response.json();
+                console.log('Class added successfully:', updatedClasses);
+                
+                // Update local class arrays
+                classesData = updatedClasses;
+                classes = classesData.map(c => typeof c === 'object' ? c.name : c);
+                
+                // Update UI
+                updateClassSelector();
+                
+                return true;
+            } else {
+                const error = await response.json();
+                console.error('Error adding class:', error.detail);
+                alert(`Error adding class: ${error.detail}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error adding class:', error);
+            alert(`Error adding class: ${error.message}`);
+            return false;
+        }
+    }
+    
+    // Function to rename a class on the server
+    async function renameClass(classIndex, newName) {
+        try {
+            const response = await fetch(`/classes/${classIndex}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ class_name: newName }),
+            });
+            
+            if (response.ok) {
+                const updatedClasses = await response.json();
+                console.log('Class renamed successfully:', updatedClasses);
+                
+                // Update local class arrays
+                classesData = updatedClasses;
+                classes = classesData.map(c => typeof c === 'object' ? c.name : c);
+                
+                // Update UI
+                updateClassSelector();
+                
+                alert(`Class renamed to "${newName}"`);
+                return true;
+            } else {
+                const error = await response.json();
+                console.error('Error renaming class:', error.detail);
+                alert(`Error renaming class: ${error.detail}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error renaming class:', error);
+            alert(`Error renaming class: ${error.message}`);
+            return false;
+        }
+    }
+    
+    // Function to delete a class from the server
+    async function deleteClass(classIndex) {
+        try {
+            const response = await fetch(`/classes/${classIndex}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                const updatedClasses = await response.json();
+                console.log('Class deleted successfully:', updatedClasses);
+                
+                // Update local class arrays
+                classesData = updatedClasses;
+                classes = classesData.map(c => typeof c === 'object' ? c.name : c);
+                
+                // Update UI
+                updateClassSelector();
+                
+                // Reset selected box class if it was using the deleted class
+                boxes.forEach(box => {
+                    if (box.class === classIndex) {
+                        box.class = 0; // Reset to first class
+                    } else if (box.class > classIndex) {
+                        box.class--; // Adjust class index for boxes using higher indexes
+                    }
+                });
+                
+                // Redraw boxes with updated classes
+                drawBoxes();
+                updateBoxStats();
+                
+                alert(`Class deleted`);
+                return true;
+            } else {
+                const error = await response.json();
+                console.error('Error deleting class:', error.detail);
+                alert(`Error deleting class: ${error.detail}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error deleting class:', error);
+            alert(`Error deleting class: ${error.message}`);
+            return false;
+        }
+    }
     
     // Add predict button click handler
     if (predictBtn) {

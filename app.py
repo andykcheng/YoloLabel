@@ -9,6 +9,8 @@ import zipfile
 import shutil
 from typing import List, Dict, Optional
 import yolo_predict
+from PIL import Image
+from datetime import datetime
 
 app = FastAPI(title="Image Files API")
 
@@ -23,6 +25,8 @@ app.add_middleware(
 
 # Define the path to the images folder
 IMAGES_FOLDER = os.path.join(os.getcwd(), "images")
+# Define the path to original images folder
+ORIGINAL_IMAGES_FOLDER = os.path.join(os.getcwd(), "original_images")
 # Define the path to classes file
 CLASSES_FILE = os.path.join(os.getcwd(), "classes.json")
 # Define the path to annotations folder
@@ -32,6 +36,8 @@ FILE_STATUS_PATH = os.path.join(os.getcwd(), "file_statuses.json")
 
 # Make sure the images folder exists
 os.makedirs(IMAGES_FOLDER, exist_ok=True)
+# Make sure the original images folder exists
+os.makedirs(ORIGINAL_IMAGES_FOLDER, exist_ok=True)
 # Make sure the annotations folder exists
 os.makedirs(ANNOTATIONS_FOLDER, exist_ok=True)
 
@@ -437,7 +443,12 @@ async def upload_files(files: List[UploadFile] = File(...)):
         skipped_count = 0
         uploaded_files = []
         skipped_files = []
-        
+
+        # Ensure original_images folder exists
+        os.makedirs(ORIGINAL_IMAGES_FOLDER, exist_ok=True)
+        # Ensure images folder exists
+        os.makedirs(IMAGES_FOLDER, exist_ok=True)
+
         # Process each uploaded file
         for file in files:
             # Check if it's an image file by content type
@@ -446,7 +457,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 skipped_files.append(f"{file.filename} (not an image)")
                 skipped_count += 1
                 continue
-            
+
             # Check file extension as a secondary validation
             filename = file.filename
             valid_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
@@ -454,21 +465,53 @@ async def upload_files(files: List[UploadFile] = File(...)):
                 skipped_files.append(f"{filename} (invalid extension)")
                 skipped_count += 1
                 continue
-            
-            # Save the file to the images folder
-            file_path = os.path.join(IMAGES_FOLDER, filename)
-            
-            # Read the content into memory
+
+            # Read the file contents
             contents = await file.read()
             
-            # Save the file
-            with open(file_path, 'wb') as f:
+            # Save the file to the original_images folder
+            original_file_path = os.path.join(ORIGINAL_IMAGES_FOLDER, filename)
+            with open(original_file_path, 'wb') as f:
                 f.write(contents)
-            
-            # Track successful uploads
-            uploaded_files.append(filename)
-            uploaded_count += 1
-        
+
+            # Open the image and resize it to 1280x720
+            try:
+                with Image.open(original_file_path) as img:
+                    # Calculate cropping box to center the image
+                    width, height = img.size
+                    target_width, target_height = 1280, 720
+
+                    if width / height > target_width / target_height:
+                        # Image is too wide, trim the sides
+                        new_width = int(height * target_width / target_height)
+                        left = (width - new_width) // 2
+                        right = left + new_width
+                        top, bottom = 0, height
+                    else:
+                        # Image is too tall, trim the top and bottom
+                        new_height = int(width * target_height / target_width)
+                        top = (height - new_height) // 2
+                        bottom = top + new_height
+                        left, right = 0, width
+
+                    img = img.crop((left, top, right, bottom))
+                    # Replace deprecated ANTIALIAS with LANCZOS (the modern equivalent)
+                    img = img.resize((target_width, target_height), Image.LANCZOS)
+
+                    # Save the resized image to the images folder
+                    resized_file_path = os.path.join(IMAGES_FOLDER, filename)
+                    img.save(resized_file_path)
+
+                    # Track successful uploads
+                    uploaded_files.append(filename)
+                    uploaded_count += 1
+                    
+                    print(f"Successfully processed {filename}: Original saved to {original_file_path}, Resized saved to {resized_file_path}")
+            except Exception as e:
+                print(f"Error processing image {filename}: {str(e)}")
+                skipped_files.append(f"{filename} (error during processing: {str(e)})")
+                skipped_count += 1
+
         return {
             "message": "Files uploaded successfully",
             "uploaded_count": uploaded_count,
@@ -644,4 +687,55 @@ names: {json.dumps(class_list)}  # Class names
         }
     except Exception as e:
         print(f"Error setting up training environment: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/backup")
+async def backup_data():
+    """Create a backup zip file containing classes.json, file_statuses.json, 
+    images folder, and annotations folder."""
+    try:
+        # Get current date for filename
+        current_date = datetime.now().strftime("%Y_%m_%d")
+        zip_filename = f"backup_{current_date}.zip"
+        
+        # Create a zip file in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add classes.json if it exists
+            if os.path.exists(CLASSES_FILE):
+                zip_file.write(CLASSES_FILE, os.path.basename(CLASSES_FILE))
+            
+            # Add file_statuses.json if it exists
+            if os.path.exists(FILE_STATUS_PATH):
+                zip_file.write(FILE_STATUS_PATH, os.path.basename(FILE_STATUS_PATH))
+            
+            # Add all files from the images folder
+            if os.path.exists(IMAGES_FOLDER):
+                for root, _, files in os.walk(IMAGES_FOLDER):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # Calculate the arcname (path within the zip file)
+                        arcname = os.path.join("images", os.path.relpath(file_path, IMAGES_FOLDER))
+                        zip_file.write(file_path, arcname)
+            
+            # Add all files from the annotations folder
+            if os.path.exists(ANNOTATIONS_FOLDER):
+                for root, _, files in os.walk(ANNOTATIONS_FOLDER):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # Calculate the arcname (path within the zip file)
+                        arcname = os.path.join("annotations", os.path.relpath(file_path, ANNOTATIONS_FOLDER))
+                        zip_file.write(file_path, arcname)
+        
+        # Reset the buffer position
+        zip_buffer.seek(0)
+        
+        # Return the zip file for download
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={zip_filename}"}
+        )
+    except Exception as e:
+        print(f"Error creating backup: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
